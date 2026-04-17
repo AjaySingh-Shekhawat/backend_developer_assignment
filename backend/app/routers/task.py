@@ -1,33 +1,51 @@
-from fastapi import HTTPException
+from fastapi import APIRouter, HTTPException
+from app.database import SessionLocal
+from app.models.task import Task
+from app.schemes.task import TaskCreate
 
-from backend.app.database import SessionLocal
-from backend.app.models.task import Task
-from backend.app.routers.auth import router
-
+router = APIRouter()
 
 @router.post("/tasks")
-def create_task(title:str,description:str):
+def create_task(task: TaskCreate):
     db = SessionLocal()
-    task = Task(title=title,description=description)
-    db.add(task)
-    db.commit()
+    try:
+        new_task = Task(
+            title=task.title,
+            description=task.description
+        )
 
-    return task
+        db.add(new_task)
+        db.commit()
+        db.refresh(new_task)
+
+        return new_task
+
+    finally:
+        db.close()
+
 
 @router.get("/tasks")
 def get_task():
     db = SessionLocal()
-    task = db.query(Task).all()
-    return task
+    try:
+        return db.query(Task).all()
+    finally:
+        db.close()
+
 
 @router.delete("/tasks/{task_id}")
-def delete_task(task_id:int):
+def delete_task(task_id: int):
     db = SessionLocal()
-    task = db.qurery(Task).filter(Task.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    db.delete(task)
-    db.commit()
-    return {"message":"Task Deleted"}
+    try:
+        task = db.query(Task).filter(Task.id == task_id).first()
 
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
 
+        db.delete(task)
+        db.commit()
+
+        return {"message": "Task Deleted"}
+
+    finally:
+        db.close()
